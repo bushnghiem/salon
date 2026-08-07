@@ -15,6 +15,12 @@ router = APIRouter(
     dependencies=[Depends(get_current_active_user)],
 )
 
+@router.get("/me", response_model=User)
+def get_current_user(
+    current_user: models.User = Depends(get_current_active_user),
+):
+    return current_user
+
 
 @router.get("/", response_model=list[User])
 def get_users(db: Session = Depends(get_db)):
