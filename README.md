@@ -1,6 +1,6 @@
 Salon Management System
 
-A full-stack salon management application for managing customers, technicians, services, appointments, users, and business analytics.
+A full-stack salon management application for managing customers, technicians, services, appointments, and business analytics.
 
 The application provides an administrative interface for managing day-to-day salon operations while enforcing appointment scheduling rules such as technician availability, working hours, appointment conflicts, and valid appointment status transitions.
 
@@ -25,7 +25,6 @@ Authentication & Authorization
     JWT-based user authentication
     Password hashing
     Protected API endpoints
-    Role-based user management
     Disabled-user handling
     Authenticated frontend routing
 
