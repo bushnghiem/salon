@@ -121,8 +121,8 @@ class Appointment(AppointmentBase):
 
 class ServiceBase(BaseModel):
     name: str
-    duration: int
-    price: float
+    duration: int = Field(gt=0)
+    price: float = Field(ge=0)
     description: str
 
 

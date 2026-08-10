@@ -134,6 +134,7 @@ def get_availability(
     technician_id: int,
     service_id: int,
     date: date,
+    exclude_appointment_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     technician = get_technician_or_404(db, technician_id)
@@ -164,8 +165,10 @@ def get_availability(
             technician_id=technician_id,
             start_time=slot,
             duration=service.duration,
+            exclude_appointment_id=exclude_appointment_id,
         ):
             available.append(slot.strftime("%H:%M"))
+
 
     return available
 
@@ -246,14 +249,21 @@ def update_appointment(
         if updated_appointment.appointment_time is not None
         else appointment.appointment_time
     )
-    
-    check_technician_availability(
-        db=db,
-        technician_id=new_technician_id,
-        start_time=new_start,
-        duration=service.duration,
-        exclude_appointment_id=appointment_id,
-    )
+
+    should_check_availability = any([
+        updated_appointment.technician_id is not None,
+        updated_appointment.service_id is not None,
+        updated_appointment.appointment_time is not None,
+    ])
+
+    if should_check_availability:
+        check_technician_availability(
+            db=db,
+            technician_id=new_technician_id,
+            start_time=new_start,
+            duration=service.duration,
+            exclude_appointment_id=appointment_id,
+        )
 
     if updated_appointment.customer_id is not None:
         appointment.customer_id = updated_appointment.customer_id
@@ -272,8 +282,9 @@ def update_appointment(
     if updated_appointment.status is not None:
         appointment.status = updated_appointment.status
 
-    if updated_appointment.notes is not None:
+    if "notes" in updated_appointment.model_fields_set:
         appointment.notes = updated_appointment.notes
+
 
 
     db.commit()
