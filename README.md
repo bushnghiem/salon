@@ -88,3 +88,78 @@ Backend
 Database
 
     SQLite
+
+
+Getting Started
+
+Prerequisites
+
+Make sure the following are installed:
+
+    Python 3.10+
+    Node.js 18+
+    npm
+
+Backend Setup
+
+Create a virtual environment in the main Salon Folder:
+
+    python -m venv .venv
+
+Activate the virtual environment.
+
+Windows:
+
+    .venv\Scripts\activate
+
+macOS / Linux:
+
+    source .venv/bin/activate
+
+Navigate to the backend directory:
+
+    cd backend
+
+Install the backend dependencies:
+
+    pip install -r requirements.txt
+
+Start the FastAPI development server:
+
+    uv run fastapi dev
+
+The backend will be available at:
+
+    http://localhost:8000
+
+FastAPI's interactive API documentation is available at:
+
+    http://localhost:8000/docs
+
+Frontend Setup
+
+Open a new terminal and activate the virtual environment in the main Salon Folder.
+
+Windows:
+
+    .venv\Scripts\activate
+
+macOS / Linux:
+
+    source .venv/bin/activate
+
+Navigate to the frontend directory:
+
+    cd frontend
+
+Install dependencies:
+
+    npm install
+
+Start the development server:
+
+    npm run dev
+
+The frontend will be available at:
+
+    http://localhost:5173
