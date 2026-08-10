@@ -128,11 +128,11 @@ Start the FastAPI development server:
 
     uvicorn app.main:app --reload
 
-The backend will be available at:
+The backend will be available at (Nothing is there):
 
     http://localhost:8000
 
-FastAPI's interactive API documentation is available at:
+FastAPI's interactive API documentation is available at (You can register an account here):
 
     http://localhost:8000/docs
 
