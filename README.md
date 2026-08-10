@@ -126,7 +126,7 @@ Install the backend dependencies:
 
 Start the FastAPI development server:
 
-    uv run fastapi dev
+    uvicorn app.main:app --reload
 
 The backend will be available at:
 
