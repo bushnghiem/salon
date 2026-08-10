@@ -136,6 +136,15 @@ FastAPI's interactive API documentation is available at (You can register an acc
 
     http://localhost:8000/docs
 
+Register an account by following these steps
+
+    Go to this url http://localhost:8000/docs
+    Scroll Down to the authentication section and click on register
+    Click on Try It Out button at top right and fill out the following forms
+    When Finished click on the Execute button
+
+![Register](docs/screenshots/registration.png)
+
 Frontend Setup
 
 Open a new terminal and activate the virtual environment in the main Salon Folder.
