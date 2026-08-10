@@ -1,34 +1,13 @@
 import { apiFetch } from "./client";
-import type { DashboardData } from "../types/dashboard";
 
-
-export interface MonthlyRevenue {
-    month: string;
-    revenue: number;
-}
-
-
-export interface PopularService {
-    service: string;
-    appointments: number;
-}
-
-
-export interface TechnicianWorkload {
-    technician: string;
-    appointments: number;
-}
-
-
-export interface BusiestDay {
-    day: string;
-    appointments: number;
-}
-
-
-export interface AverageAppointment {
-    average_appointment: number;
-}
+import type {
+    DashboardData,
+    PopularService,
+    TechnicianWorkload,
+    BusiestDay,
+    Timeframe,
+    MonthlyRevenue,
+} from "../types/dashboard";
 
 
 export async function getDashboard(): Promise<DashboardData> {
@@ -36,35 +15,27 @@ export async function getDashboard(): Promise<DashboardData> {
     const response =
         await apiFetch("/dashboard/");
 
+
     if (!response.ok) {
         throw new Error(
             "Failed to fetch dashboard"
         );
     }
 
+
     return response.json();
 }
 
 
-export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
+export async function getPopularServices(
+    timeframe: Timeframe
+): Promise<PopularService[]> {
 
     const response =
-        await apiFetch("/dashboard/revenue");
-
-    if (!response.ok) {
-        throw new Error(
-            "Failed to fetch monthly revenue"
+        await apiFetch(
+            `/dashboard/popular-services?timeframe=${timeframe}`
         );
-    }
 
-    return response.json();
-}
-
-
-export async function getPopularServices(): Promise<PopularService[]> {
-
-    const response =
-        await apiFetch("/dashboard/popular-services");
 
     if (!response.ok) {
         throw new Error(
@@ -72,14 +43,20 @@ export async function getPopularServices(): Promise<PopularService[]> {
         );
     }
 
+
     return response.json();
 }
 
 
-export async function getTechnicianWorkload(): Promise<TechnicianWorkload[]> {
+export async function getTechnicianWorkload(
+    timeframe: Timeframe
+): Promise<TechnicianWorkload[]> {
 
     const response =
-        await apiFetch("/dashboard/technician-workload");
+        await apiFetch(
+            `/dashboard/technician-workload?timeframe=${timeframe}`
+        );
+
 
     if (!response.ok) {
         throw new Error(
@@ -87,14 +64,20 @@ export async function getTechnicianWorkload(): Promise<TechnicianWorkload[]> {
         );
     }
 
+
     return response.json();
 }
 
 
-export async function getBusiestDays(): Promise<BusiestDay[]> {
+export async function getBusiestDays(
+    timeframe: Timeframe
+): Promise<BusiestDay[]> {
 
     const response =
-        await apiFetch("/dashboard/busiest-days");
+        await apiFetch(
+            `/dashboard/busiest-days?timeframe=${timeframe}`
+        );
+
 
     if (!response.ok) {
         throw new Error(
@@ -102,19 +85,16 @@ export async function getBusiestDays(): Promise<BusiestDay[]> {
         );
     }
 
+
     return response.json();
 }
 
+export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
 
-export async function getAverageAppointment(): Promise<AverageAppointment> {
-
-    const response =
-        await apiFetch("/dashboard/average-appointment");
+    const response = await apiFetch("/dashboard/revenue");
 
     if (!response.ok) {
-        throw new Error(
-            "Failed to fetch average appointment"
-        );
+        throw new Error("Failed to fetch monthly revenue");
     }
 
     return response.json();

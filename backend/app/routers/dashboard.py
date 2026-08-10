@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+from typing import Literal
 
 from app.database import get_db
 from app.enums import AppointmentStatus
@@ -16,18 +17,75 @@ router = APIRouter(
 )
 
 
-@router.get("/")
-def get_dashboard(db: Session = Depends(get_db)):
+Timeframe = Literal["week", "month", "year"]
+
+
+def get_timeframe_range(timeframe: Timeframe):
+    """
+    Returns the start and end datetime for the requested timeframe.
+
+    week  = Monday through today
+    month = first day of current month through today
+    year  = January 1 through today
+    """
+
     today = date.today()
-    start = datetime.combine(today, time.min)
-    end = datetime.combine(today, time.max)
+
+    if timeframe == "week":
+
+        start_date = today - timedelta(
+            days=today.weekday()
+        )
+
+    elif timeframe == "month":
+
+        start_date = today.replace(
+            day=1
+        )
+
+    else:
+
+        start_date = today.replace(
+            month=1,
+            day=1
+        )
+
+    start = datetime.combine(
+        start_date,
+        time.min
+    )
+
+    end = datetime.combine(
+        today + timedelta(days=1),
+        time.min
+    )
+
+    return start, end
+
+
+@router.get("/")
+def get_dashboard(
+    db: Session = Depends(get_db)
+):
+
+    today = date.today()
+
+    start = datetime.combine(
+        today,
+        time.min
+    )
+
+    end = datetime.combine(
+        today + timedelta(days=1),
+        time.min
+    )
 
 
     appointments_today = (
         db.query(models.Appointment)
         .filter(
             models.Appointment.appointment_time >= start,
-            models.Appointment.appointment_time <= end,
+            models.Appointment.appointment_time < end,
         )
         .count()
     )
@@ -35,71 +93,107 @@ def get_dashboard(db: Session = Depends(get_db)):
 
     scheduled = (
         db.query(models.Appointment)
-        .filter(models.Appointment.status == AppointmentStatus.SCHEDULED)
-        .count()
-    )
-
-    confirmed = (
-        db.query(models.Appointment)
-        .filter(models.Appointment.status == AppointmentStatus.CONFIRMED)
-        .count()
-    )
-
-    completed = (
-        db.query(models.Appointment)
-        .filter(models.Appointment.status == AppointmentStatus.COMPLETED)
-        .count()
-    )
-
-    cancelled = (
-        db.query(models.Appointment)
-        .filter(models.Appointment.status == AppointmentStatus.CANCELLED)
-        .count()
-    )
-
-    no_show = (
-        db.query(models.Appointment)
         .filter(
-            models.Appointment.status == AppointmentStatus.NO_SHOW
+            models.Appointment.status ==
+            AppointmentStatus.SCHEDULED
         )
         .count()
     )
 
 
+    confirmed = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.status ==
+            AppointmentStatus.CONFIRMED
+        )
+        .count()
+    )
+
+
+    completed = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.status ==
+            AppointmentStatus.COMPLETED
+        )
+        .count()
+    )
+
+
+    cancelled = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.status ==
+            AppointmentStatus.CANCELLED
+        )
+        .count()
+    )
+
+
+    no_show = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.status ==
+            AppointmentStatus.NO_SHOW
+        )
+        .count()
+    )
+
 
     revenue_today = (
-        db.query(func.sum(models.Appointment.booked_price))
+        db.query(
+            func.sum(
+                models.Appointment.booked_price
+            )
+        )
         .filter(
-            models.Appointment.status == AppointmentStatus.COMPLETED,
+            models.Appointment.status ==
+            AppointmentStatus.COMPLETED,
+
             models.Appointment.appointment_time >= start,
-            models.Appointment.appointment_time <= end,
+
+            models.Appointment.appointment_time < end,
         )
         .scalar()
         or 0
     )
 
 
-    customer_count = db.query(models.Customer).count()
+    customer_count = (
+        db.query(models.Customer)
+        .count()
+    )
 
 
-    technician_count = db.query(models.Technician).count()
+    technician_count = (
+        db.query(models.Technician)
+        .count()
+    )
 
 
     upcoming = (
         db.query(models.Appointment)
         .filter(
-            models.Appointment.appointment_time >= datetime.now(),
-            models.Appointment.status != AppointmentStatus.CANCELLED,
+            models.Appointment.appointment_time >=
+            datetime.now(),
+
+            models.Appointment.status !=
+            AppointmentStatus.CANCELLED,
         )
-        .order_by(models.Appointment.appointment_time)
+        .order_by(
+            models.Appointment.appointment_time
+        )
         .limit(5)
         .all()
     )
+
 
     return {
         "today": {
             "appointments": appointments_today,
         },
+
         "status": {
             "scheduled": scheduled,
             "confirmed": confirmed,
@@ -107,11 +201,15 @@ def get_dashboard(db: Session = Depends(get_db)):
             "cancelled": cancelled,
             "no_show": no_show,
         },
+
         "revenue": {
             "today": revenue_today,
         },
+
         "customers": customer_count,
+
         "technicians": technician_count,
+
         "upcoming": [
             {
                 "appointment_id": appointment.id,
@@ -129,48 +227,104 @@ def get_dashboard(db: Session = Depends(get_db)):
 def get_monthly_revenue(db: Session = Depends(get_db)):
     revenue = (
         db.query(
-            extract("year", models.Appointment.appointment_time).label("year"),
-            extract("month", models.Appointment.appointment_time).label("month"),
-            func.sum(models.Appointment.booked_price).label("revenue"),
+            extract(
+                "year",
+                models.Appointment.appointment_time
+            ).label("year"),
+
+            extract(
+                "month",
+                models.Appointment.appointment_time
+            ).label("month"),
+
+            func.sum(
+                models.Appointment.booked_price
+            ).label("revenue"),
         )
         .filter(
-            models.Appointment.status == AppointmentStatus.COMPLETED
+            models.Appointment.status ==
+            AppointmentStatus.COMPLETED
         )
         .group_by(
-            extract("year", models.Appointment.appointment_time),
-            extract("month", models.Appointment.appointment_time),
+            extract(
+                "year",
+                models.Appointment.appointment_time
+            ),
+
+            extract(
+                "month",
+                models.Appointment.appointment_time
+            ),
         )
         .order_by(
-            extract("year", models.Appointment.appointment_time),
-            extract("month", models.Appointment.appointment_time),
+            extract(
+                "year",
+                models.Appointment.appointment_time
+            ),
+
+            extract(
+                "month",
+                models.Appointment.appointment_time
+            ),
         )
         .all()
     )
 
     return [
         {
-            "month": f"{int(row.year)}-{int(row.month):02}",
-            "revenue": row.revenue,
+            "month":
+                f"{int(row.year)}-{int(row.month):02}",
+
+            "revenue":
+                float(row.revenue or 0),
         }
+
         for row in revenue
     ]
 
 
+
 @router.get("/popular-services")
-def get_popular_services(db: Session = Depends(get_db)):
+def get_popular_services(
+    timeframe: Timeframe = Query(
+        "month"
+    ),
+    db: Session = Depends(get_db),
+):
+
+    start, end = get_timeframe_range(
+        timeframe
+    )
+
+
     services = (
         db.query(
             models.Service.name,
-            func.count(models.Appointment.id).label("appointments"),
+
+            func.count(
+                models.Appointment.id
+            ).label("appointments"),
         )
         .join(
             models.Appointment,
-            models.Service.id == models.Appointment.service_id,
+            models.Service.id ==
+            models.Appointment.service_id,
         )
-        .group_by(models.Service.id)
-        .order_by(func.count(models.Appointment.id).desc())
+        .filter(
+            models.Appointment.appointment_time >= start,
+            models.Appointment.appointment_time < end,
+        )
+        .group_by(
+            models.Service.id
+        )
+        .order_by(
+            func.count(
+                models.Appointment.id
+            ).desc()
+        )
         .all()
     )
+
 
     return [
         {
@@ -182,20 +336,46 @@ def get_popular_services(db: Session = Depends(get_db)):
 
 
 @router.get("/technician-workload")
-def get_technician_workload(db: Session = Depends(get_db)):
+def get_technician_workload(
+    timeframe: Timeframe = Query(
+        "month"
+    ),
+    db: Session = Depends(get_db),
+):
+
+    start, end = get_timeframe_range(
+        timeframe
+    )
+
+
     workload = (
         db.query(
             models.Technician.name,
-            func.count(models.Appointment.id).label("appointments"),
+
+            func.count(
+                models.Appointment.id
+            ).label("appointments"),
         )
         .join(
             models.Appointment,
-            models.Technician.id == models.Appointment.technician_id,
+            models.Technician.id ==
+            models.Appointment.technician_id,
         )
-        .group_by(models.Technician.id)
-        .order_by(func.count(models.Appointment.id).desc())
+        .filter(
+            models.Appointment.appointment_time >= start,
+            models.Appointment.appointment_time < end,
+        )
+        .group_by(
+            models.Technician.id
+        )
+        .order_by(
+            func.count(
+                models.Appointment.id
+            ).desc()
+        )
         .all()
     )
+
 
     return [
         {
@@ -207,20 +387,47 @@ def get_technician_workload(db: Session = Depends(get_db)):
 
 
 @router.get("/busiest-days")
-def get_busiest_days(db: Session = Depends(get_db)):
+def get_busiest_days(
+    timeframe: Timeframe = Query(
+        "month"
+    ),
+    db: Session = Depends(get_db),
+):
+
+    start, end = get_timeframe_range(
+        timeframe
+    )
+
+
     days = (
         db.query(
-            extract("dow", models.Appointment.appointment_time).label("day"),
-            func.count(models.Appointment.id).label("appointments"),
+            extract(
+                "dow",
+                models.Appointment.appointment_time
+            ).label("day"),
+
+            func.count(
+                models.Appointment.id
+            ).label("appointments"),
+        )
+        .filter(
+            models.Appointment.appointment_time >= start,
+            models.Appointment.appointment_time < end,
         )
         .group_by(
-            extract("dow", models.Appointment.appointment_time)
+            extract(
+                "dow",
+                models.Appointment.appointment_time
+            )
         )
         .order_by(
-            func.count(models.Appointment.id).desc()
+            func.count(
+                models.Appointment.id
+            ).desc()
         )
         .all()
     )
+
 
     day_names = {
         0: "Sunday",
@@ -232,6 +439,7 @@ def get_busiest_days(db: Session = Depends(get_db)):
         6: "Saturday",
     }
 
+
     return [
         {
             "day": day_names[int(row.day)],
@@ -242,17 +450,27 @@ def get_busiest_days(db: Session = Depends(get_db)):
 
 
 @router.get("/average-appointment")
-def get_average_appointment(db: Session = Depends(get_db)):
+def get_average_appointment(
+    db: Session = Depends(get_db)
+):
+
     average = (
         db.query(
-            func.avg(models.Appointment.booked_price)
+            func.avg(
+                models.Appointment.booked_price
+            )
         )
         .filter(
-            models.Appointment.status == AppointmentStatus.COMPLETED
+            models.Appointment.status ==
+            AppointmentStatus.COMPLETED
         )
         .scalar()
     )
 
+
     return {
-        "average_appointment": round(average or 0, 2)
+        "average_appointment": round(
+            average or 0,
+            2
+        )
     }

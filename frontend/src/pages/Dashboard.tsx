@@ -4,60 +4,35 @@ import { useAuth } from "../context/AuthContext";
 
 import {
     getDashboard,
-    getMonthlyRevenue,
     getPopularServices,
     getTechnicianWorkload,
     getBusiestDays,
-    getAverageAppointment,
+    getMonthlyRevenue,
 } from "../api/dashboard";
 
-import type { DashboardData } from "../types/dashboard";
-
 import type {
-    MonthlyRevenue,
+    DashboardData,
     PopularService,
     TechnicianWorkload,
     BusiestDay,
-    AverageAppointment,
-} from "../api/dashboard";
+    Timeframe,
+    MonthlyRevenue,
+} from "../types/dashboard";
 
 
-function formatCurrency(
-    value: number
+function timeframeLabel(
+    timeframe: Timeframe
 ): string {
 
-    return new Intl.NumberFormat(
-        "en-US",
-        {
-            style: "currency",
-            currency: "USD",
-        }
-    ).format(value);
-}
+    if (timeframe === "week") {
+        return "This Week";
+    }
 
+    if (timeframe === "month") {
+        return "This Month";
+    }
 
-function formatMonth(
-    month: string
-): string {
-
-    const [
-        year,
-        monthNumber,
-    ] = month.split("-").map(Number);
-
-    const date = new Date(
-        year,
-        monthNumber - 1,
-        1
-    );
-
-    return date.toLocaleDateString(
-        "en-US",
-        {
-            month: "short",
-            year: "numeric",
-        }
-    );
+    return "This Year";
 }
 
 
@@ -69,20 +44,37 @@ export default function Dashboard() {
     const [dashboard, setDashboard] =
         useState<DashboardData | null>(null);
 
-    const [monthlyRevenue, setMonthlyRevenue] =
-        useState<MonthlyRevenue[]>([]);
 
     const [popularServices, setPopularServices] =
         useState<PopularService[]>([]);
 
+
     const [technicianWorkload, setTechnicianWorkload] =
         useState<TechnicianWorkload[]>([]);
+
 
     const [busiestDays, setBusiestDays] =
         useState<BusiestDay[]>([]);
 
-    const [averageAppointment, setAverageAppointment] =
-        useState<AverageAppointment | null>(null);
+
+    const [popularServicesTimeframe, setPopularServicesTimeframe] =
+        useState<Timeframe>("month");
+
+
+    const [technicianWorkloadTimeframe, setTechnicianWorkloadTimeframe] =
+        useState<Timeframe>("month");
+
+
+    const [busiestDaysTimeframe, setBusiestDaysTimeframe] =
+        useState<Timeframe>("month");
+
+
+    const [monthlyRevenue, setMonthlyRevenue] =
+        useState<MonthlyRevenue[]>([]);
+
+
+    const [loadingAnalytics, setLoadingAnalytics] =
+        useState(true);
 
 
     const [error, setError] =
@@ -97,47 +89,16 @@ export default function Dashboard() {
 
                 setError("");
 
-
                 const [
                     dashboardData,
                     revenueData,
-                    servicesData,
-                    workloadData,
-                    busiestDaysData,
-                    averageAppointmentData,
                 ] = await Promise.all([
                     getDashboard(),
                     getMonthlyRevenue(),
-                    getPopularServices(),
-                    getTechnicianWorkload(),
-                    getBusiestDays(),
-                    getAverageAppointment(),
                 ]);
 
-
-                setDashboard(
-                    dashboardData
-                );
-
-                setMonthlyRevenue(
-                    revenueData
-                );
-
-                setPopularServices(
-                    servicesData
-                );
-
-                setTechnicianWorkload(
-                    workloadData
-                );
-
-                setBusiestDays(
-                    busiestDaysData
-                );
-
-                setAverageAppointment(
-                    averageAppointmentData
-                );
+                setDashboard(dashboardData);
+                setMonthlyRevenue(revenueData);
 
             } catch {
 
@@ -155,7 +116,72 @@ export default function Dashboard() {
     }, []);
 
 
-    if (error) {
+    useEffect(() => {
+
+        async function loadAnalytics() {
+
+            try {
+
+                setLoadingAnalytics(true);
+
+                const [
+                    services,
+                    workload,
+                    days,
+                ] = await Promise.all([
+
+                    getPopularServices(
+                        popularServicesTimeframe
+                    ),
+
+                    getTechnicianWorkload(
+                        technicianWorkloadTimeframe
+                    ),
+
+                    getBusiestDays(
+                        busiestDaysTimeframe
+                    ),
+
+                ]);
+
+
+                setPopularServices(
+                    services
+                );
+
+                setTechnicianWorkload(
+                    workload
+                );
+
+                setBusiestDays(
+                    days
+                );
+
+            } catch {
+
+                setError(
+                    "Failed to load dashboard analytics."
+                );
+
+            } finally {
+
+                setLoadingAnalytics(false);
+
+            }
+
+        }
+
+
+        loadAnalytics();
+
+    }, [
+        popularServicesTimeframe,
+        technicianWorkloadTimeframe,
+        busiestDaysTimeframe,
+    ]);
+
+
+    if (error && !dashboard) {
 
         return (
 
@@ -199,42 +225,6 @@ export default function Dashboard() {
     }
 
 
-    const maxRevenue =
-        Math.max(
-            ...monthlyRevenue.map(
-                (item) => Number(item.revenue)
-            ),
-            1
-        );
-
-
-    const maxServiceAppointments =
-        Math.max(
-            ...popularServices.map(
-                (item) => item.appointments
-            ),
-            1
-        );
-
-
-    const maxTechnicianAppointments =
-        Math.max(
-            ...technicianWorkload.map(
-                (item) => item.appointments
-            ),
-            1
-        );
-
-
-    const maxDayAppointments =
-        Math.max(
-            ...busiestDays.map(
-                (item) => item.appointments
-            ),
-            1
-        );
-
-
     return (
 
         <div className="space-y-8">
@@ -253,6 +243,7 @@ export default function Dashboard() {
                     Dashboard
                 </h1>
 
+
                 <p
                     className="
                         mt-2
@@ -265,6 +256,28 @@ export default function Dashboard() {
                 </p>
 
             </div>
+
+
+            {/* Analytics Error */}
+
+            {error && (
+
+                <div
+                    className="
+                        rounded-lg
+                        border
+                        border-red-200
+                        bg-red-50
+                        px-4
+                        py-3
+                        text-sm
+                        text-red-700
+                    "
+                >
+                    {error}
+                </div>
+
+            )}
 
 
             {/* Summary Cards */}
@@ -310,6 +323,7 @@ export default function Dashboard() {
                             Today's Appointments
                         </p>
 
+
                         <div
                             className="
                                 flex
@@ -326,6 +340,7 @@ export default function Dashboard() {
                         </div>
 
                     </div>
+
 
                     <p
                         className="
@@ -372,6 +387,7 @@ export default function Dashboard() {
                             Revenue Today
                         </p>
 
+
                         <div
                             className="
                                 flex
@@ -389,6 +405,7 @@ export default function Dashboard() {
 
                     </div>
 
+
                     <p
                         className="
                             mt-4
@@ -397,11 +414,9 @@ export default function Dashboard() {
                             text-gray-900
                         "
                     >
-                        {formatCurrency(
-                            Number(
-                                dashboard.revenue.today
-                            )
-                        )}
+                        ${Number(
+                            dashboard.revenue.today
+                        ).toFixed(2)}
                     </p>
 
                 </div>
@@ -438,6 +453,7 @@ export default function Dashboard() {
                             Customers
                         </p>
 
+
                         <div
                             className="
                                 flex
@@ -454,6 +470,7 @@ export default function Dashboard() {
                         </div>
 
                     </div>
+
 
                     <p
                         className="
@@ -500,6 +517,7 @@ export default function Dashboard() {
                             Technicians
                         </p>
 
+
                         <div
                             className="
                                 flex
@@ -517,6 +535,7 @@ export default function Dashboard() {
 
                     </div>
 
+
                     <p
                         className="
                             mt-4
@@ -529,6 +548,189 @@ export default function Dashboard() {
                     </p>
 
                 </div>
+
+            </div>
+
+
+            {/* Monthly Revenue */}
+
+            <div
+                className="
+                    overflow-hidden
+                    rounded-xl
+                    border
+                    border-gray-200
+                    bg-white
+                    shadow-sm
+                "
+            >
+
+                <div
+                    className="
+                        border-b
+                        border-gray-200
+                        px-6
+                        py-5
+                    "
+                >
+
+                    <h2
+                        className="
+                            text-lg
+                            font-semibold
+                            text-gray-900
+                        "
+                    >
+                        Monthly Revenue
+                    </h2>
+
+                    <p
+                        className="
+                            mt-1
+                            text-sm
+                            text-gray-500
+                        "
+                    >
+                        Completed appointment revenue by month.
+                    </p>
+
+                </div>
+
+
+                {monthlyRevenue.length === 0 ? (
+
+                    <div
+                        className="
+                            px-6
+                            py-12
+                            text-center
+                        "
+                    >
+
+                        <p
+                            className="
+                                text-sm
+                                font-medium
+                                text-gray-900
+                            "
+                        >
+                            No revenue data available.
+                        </p>
+
+                        <p
+                            className="
+                                mt-1
+                                text-sm
+                                text-gray-500
+                            "
+                        >
+                            Completed appointments will appear here.
+                        </p>
+
+                    </div>
+
+                ) : (
+
+                    <div className="p-6">
+
+                        <div className="space-y-4">
+
+                            {monthlyRevenue.map(
+                                (month) => {
+
+                                    const maxRevenue =
+                                        Math.max(
+                                            ...monthlyRevenue.map(
+                                                (item) =>
+                                                    Number(item.revenue)
+                                            ),
+                                            1
+                                        );
+
+                                    const percentage =
+                                        (
+                                            Number(month.revenue) /
+                                            maxRevenue
+                                        ) * 100;
+
+
+                                    return (
+
+                                        <div
+                                            key={month.month}
+                                        >
+
+                                            <div
+                                                className="
+                                                    mb-2
+                                                    flex
+                                                    items-center
+                                                    justify-between
+                                                "
+                                            >
+
+                                                <span
+                                                    className="
+                                                        text-sm
+                                                        font-medium
+                                                        text-gray-700
+                                                    "
+                                                >
+                                                    {month.month}
+                                                </span>
+
+                                                <span
+                                                    className="
+                                                        text-sm
+                                                        font-semibold
+                                                        text-gray-900
+                                                    "
+                                                >
+                                                    $
+                                                    {Number(
+                                                        month.revenue
+                                                    ).toFixed(2)}
+                                                </span>
+
+                                            </div>
+
+
+                                            <div
+                                                className="
+                                                    h-3
+                                                    overflow-hidden
+                                                    rounded-full
+                                                    bg-gray-100
+                                                "
+                                            >
+
+                                                <div
+                                                    className="
+                                                        h-full
+                                                        rounded-full
+                                                        bg-blue-600
+                                                        transition-all
+                                                    "
+                                                    style={{
+                                                        width:
+                                                            `${percentage}%`,
+                                                    }}
+                                                />
+
+                                            </div>
+
+                                        </div>
+
+                                    );
+
+                                }
+                            )}
+
+                        </div>
+
+                    </div>
+
+                )}
 
             </div>
 
@@ -565,6 +767,7 @@ export default function Dashboard() {
                         Upcoming Appointments
                     </h2>
 
+
                     <p
                         className="
                             mt-1
@@ -597,6 +800,7 @@ export default function Dashboard() {
                         >
                             No upcoming appointments.
                         </p>
+
 
                         <p
                             className="
@@ -645,6 +849,7 @@ export default function Dashboard() {
                                         Customer
                                     </th>
 
+
                                     <th
                                         className="
                                             px-6
@@ -660,6 +865,7 @@ export default function Dashboard() {
                                         Service
                                     </th>
 
+
                                     <th
                                         className="
                                             px-6
@@ -674,6 +880,7 @@ export default function Dashboard() {
                                     >
                                         Technician
                                     </th>
+
 
                                     <th
                                         className="
@@ -731,6 +938,7 @@ export default function Dashboard() {
                                                 }
                                             </td>
 
+
                                             <td
                                                 className="
                                                     whitespace-nowrap
@@ -744,6 +952,7 @@ export default function Dashboard() {
                                                     appointment.service
                                                 }
                                             </td>
+
 
                                             <td
                                                 className="
@@ -759,6 +968,7 @@ export default function Dashboard() {
                                                 }
                                             </td>
 
+
                                             <td
                                                 className="
                                                     whitespace-nowrap
@@ -770,15 +980,9 @@ export default function Dashboard() {
                                                     text-gray-900
                                                 "
                                             >
-                                                {new Date(
+                                                {
                                                     appointment.time
-                                                ).toLocaleTimeString(
-                                                    [],
-                                                    {
-                                                        hour: "numeric",
-                                                        minute: "2-digit",
-                                                    }
-                                                )}
+                                                }
                                             </td>
 
                                         </tr>
@@ -799,453 +1003,229 @@ export default function Dashboard() {
 
             {/* Analytics */}
 
-            <div>
+            <div
+                className="
+                    grid
+                    grid-cols-1
+                    gap-6
+                    lg:grid-cols-3
+                "
+            >
 
-                <div className="mb-5">
-
-                    <h2
-                        className="
-                            text-xl
-                            font-semibold
-                            text-gray-900
-                        "
-                    >
-                        Analytics
-                    </h2>
-
-                    <p
-                        className="
-                            mt-1
-                            text-sm
-                            text-gray-500
-                        "
-                    >
-                        Overview of your salon's performance.
-                    </p>
-
-                </div>
-
-
-                {/* Analytics Summary */}
+                {/* Popular Services */}
 
                 <div
                     className="
-                        mb-5
-                        grid
-                        grid-cols-1
-                        gap-5
-                        sm:grid-cols-2
-                        lg:grid-cols-3
+                        overflow-hidden
+                        rounded-xl
+                        border
+                        border-gray-200
+                        bg-white
+                        shadow-sm
                     "
                 >
 
-                    {/* Average Appointment */}
-
                     <div
                         className="
-                            rounded-xl
-                            border
+                            border-b
                             border-gray-200
-                            bg-white
-                            p-6
-                            shadow-sm
+                            px-6
+                            py-5
                         "
                     >
 
-                        <p
+                        <div
                             className="
-                                text-sm
-                                font-medium
-                                text-gray-500
+                                flex
+                                items-center
+                                justify-between
+                                gap-4
                             "
                         >
-                            Average Completed Appointment
-                        </p>
 
-                        <p
-                            className="
-                                mt-3
-                                text-2xl
-                                font-bold
-                                text-gray-900
-                            "
-                        >
-                            {formatCurrency(
-                                Number(
-                                    averageAppointment?.average_appointment ??
-                                    0
-                                )
-                            )}
-                        </p>
+                            <div>
 
-                    </div>
+                                <h2
+                                    className="
+                                        text-lg
+                                        font-semibold
+                                        text-gray-900
+                                    "
+                                >
+                                    Popular Services
+                                </h2>
 
 
-                    {/* Total Completed */}
+                                <p
+                                    className="
+                                        mt-1
+                                        text-sm
+                                        text-gray-500
+                                    "
+                                >
+                                    Most booked services.
+                                </p>
 
-                    <div
-                        className="
-                            rounded-xl
-                            border
-                            border-gray-200
-                            bg-white
-                            p-6
-                            shadow-sm
-                        "
-                    >
-
-                        <p
-                            className="
-                                text-sm
-                                font-medium
-                                text-gray-500
-                            "
-                        >
-                            Completed Appointments
-                        </p>
-
-                        <p
-                            className="
-                                mt-3
-                                text-2xl
-                                font-bold
-                                text-gray-900
-                            "
-                        >
-                            {dashboard.status.completed}
-                        </p>
-
-                    </div>
+                            </div>
 
 
-                    {/* Cancellation Rate */}
-
-                    <div
-                        className="
-                            rounded-xl
-                            border
-                            border-gray-200
-                            bg-white
-                            p-6
-                            shadow-sm
-                        "
-                    >
-
-                        <p
-                            className="
-                                text-sm
-                                font-medium
-                                text-gray-500
-                            "
-                        >
-                            No Shows
-                        </p>
-
-                        <p
-                            className="
-                                mt-3
-                                text-2xl
-                                font-bold
-                                text-gray-900
-                            "
-                        >
-                            {dashboard.status.no_show}
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                {/* Revenue + Services */}
-
-                <div
-                    className="
-                        grid
-                        grid-cols-1
-                        gap-5
-                        lg:grid-cols-2
-                    "
-                >
-
-                    {/* Monthly Revenue */}
-
-                    <div
-                        className="
-                            rounded-xl
-                            border
-                            border-gray-200
-                            bg-white
-                            p-6
-                            shadow-sm
-                        "
-                    >
-
-                        <div className="mb-5">
-
-                            <h3
+                            <select
+                                value={
+                                    popularServicesTimeframe
+                                }
+                                onChange={(e) =>
+                                    setPopularServicesTimeframe(
+                                        e.target.value as Timeframe
+                                    )
+                                }
                                 className="
-                                    text-base
-                                    font-semibold
-                                    text-gray-900
-                                "
-                            >
-                                Monthly Revenue
-                            </h3>
-
-                            <p
-                                className="
-                                    mt-1
+                                    rounded-lg
+                                    border
+                                    border-gray-300
+                                    bg-white
+                                    px-3
+                                    py-2
                                     text-sm
-                                    text-gray-500
+                                    text-gray-700
+                                    outline-none
+                                    focus:border-blue-500
+                                    focus:ring-2
+                                    focus:ring-blue-500/20
                                 "
                             >
-                                Revenue from completed appointments.
-                            </p>
+
+                                <option value="week">
+                                    This Week
+                                </option>
+
+                                <option value="month">
+                                    This Month
+                                </option>
+
+                                <option value="year">
+                                    This Year
+                                </option>
+
+                            </select>
 
                         </div>
 
+                    </div>
 
-                        {monthlyRevenue.length === 0 ? (
 
-                            <p
+                    <div className="divide-y divide-gray-100">
+
+                        {loadingAnalytics ? (
+
+                            <div
                                 className="
-                                    py-6
+                                    px-6
+                                    py-10
                                     text-center
                                     text-sm
                                     text-gray-500
                                 "
                             >
-                                No revenue data available.
-                            </p>
+                                Loading...
+                            </div>
+
+                        ) : popularServices.length === 0 ? (
+
+                            <div
+                                className="
+                                    px-6
+                                    py-10
+                                    text-center
+                                    text-sm
+                                    text-gray-500
+                                "
+                            >
+                                No appointments found for{" "}
+                                {timeframeLabel(
+                                    popularServicesTimeframe
+                                ).toLowerCase()}.
+                            </div>
 
                         ) : (
 
-                            <div className="space-y-4">
-
-                                {monthlyRevenue.map(
-                                    (item) => (
+                            popularServices
+                                .slice(0, 5)
+                                .map(
+                                    (
+                                        service,
+                                        index
+                                    ) => (
 
                                         <div
-                                            key={item.month}
+                                            key={
+                                                service.service
+                                            }
+                                            className="
+                                                flex
+                                                items-center
+                                                justify-between
+                                                px-6
+                                                py-4
+                                            "
                                         >
 
                                             <div
                                                 className="
-                                                    mb-1.5
                                                     flex
                                                     items-center
-                                                    justify-between
-                                                    gap-4
-                                                "
-                                            >
-
-                                                <span
-                                                    className="
-                                                        text-sm
-                                                        text-gray-600
-                                                    "
-                                                >
-                                                    {formatMonth(
-                                                        item.month
-                                                    )}
-                                                </span>
-
-                                                <span
-                                                    className="
-                                                        text-sm
-                                                        font-semibold
-                                                        text-gray-900
-                                                    "
-                                                >
-                                                    {formatCurrency(
-                                                        Number(
-                                                            item.revenue
-                                                        )
-                                                    )}
-                                                </span>
-
-                                            </div>
-
-
-                                            <div
-                                                className="
-                                                    h-2
-                                                    overflow-hidden
-                                                    rounded-full
-                                                    bg-gray-100
+                                                    gap-3
                                                 "
                                             >
 
                                                 <div
                                                     className="
-                                                        h-full
-                                                        rounded-full
-                                                        bg-green-500
-                                                    "
-                                                    style={{
-                                                        width: `${
-                                                            (
-                                                                Number(
-                                                                    item.revenue
-                                                                ) /
-                                                                maxRevenue
-                                                            ) *
-                                                            100
-                                                        }%`,
-                                                    }}
-                                                />
-
-                                            </div>
-
-                                        </div>
-
-                                    )
-                                )}
-
-                            </div>
-
-                        )}
-
-                    </div>
-
-
-                    {/* Popular Services */}
-
-                    <div
-                        className="
-                            rounded-xl
-                            border
-                            border-gray-200
-                            bg-white
-                            p-6
-                            shadow-sm
-                        "
-                    >
-
-                        <div className="mb-5">
-
-                            <h3
-                                className="
-                                    text-base
-                                    font-semibold
-                                    text-gray-900
-                                "
-                            >
-                                Popular Services
-                            </h3>
-
-                            <p
-                                className="
-                                    mt-1
-                                    text-sm
-                                    text-gray-500
-                                "
-                            >
-                                Services with the most appointments.
-                            </p>
-
-                        </div>
-
-
-                        {popularServices.length === 0 ? (
-
-                            <p
-                                className="
-                                    py-6
-                                    text-center
-                                    text-sm
-                                    text-gray-500
-                                "
-                            >
-                                No service data available.
-                            </p>
-
-                        ) : (
-
-                            <div className="space-y-4">
-
-                                {popularServices
-                                    .slice(0, 6)
-                                    .map(
-                                        (item) => (
-
-                                            <div
-                                                key={
-                                                    item.service
-                                                }
-                                            >
-
-                                                <div
-                                                    className="
-                                                        mb-1.5
                                                         flex
+                                                        h-8
+                                                        w-8
                                                         items-center
-                                                        justify-between
-                                                        gap-4
+                                                        justify-center
+                                                        rounded-lg
+                                                        bg-blue-50
+                                                        text-sm
+                                                        font-semibold
+                                                        text-blue-600
                                                     "
                                                 >
-
-                                                    <span
-                                                        className="
-                                                            text-sm
-                                                            text-gray-600
-                                                        "
-                                                    >
-                                                        {
-                                                            item.service
-                                                        }
-                                                    </span>
-
-                                                    <span
-                                                        className="
-                                                            text-sm
-                                                            font-semibold
-                                                            text-gray-900
-                                                        "
-                                                    >
-                                                        {
-                                                            item.appointments
-                                                        }
-                                                    </span>
-
+                                                    {index + 1}
                                                 </div>
 
 
-                                                <div
+                                                <span
                                                     className="
-                                                        h-2
-                                                        overflow-hidden
-                                                        rounded-full
-                                                        bg-gray-100
+                                                        text-sm
+                                                        font-medium
+                                                        text-gray-900
                                                     "
                                                 >
-
-                                                    <div
-                                                        className="
-                                                            h-full
-                                                            rounded-full
-                                                            bg-blue-500
-                                                        "
-                                                        style={{
-                                                            width: `${
-                                                                (
-                                                                    item.appointments /
-                                                                    maxServiceAppointments
-                                                                ) *
-                                                                100
-                                                            }%`,
-                                                        }}
-                                                    />
-
-                                                </div>
+                                                    {
+                                                        service.service
+                                                    }
+                                                </span>
 
                                             </div>
 
-                                        )
-                                    )}
 
-                            </div>
+                                            <span
+                                                className="
+                                                    text-sm
+                                                    font-semibold
+                                                    text-gray-700
+                                                "
+                                            >
+                                                {
+                                                    service.appointments
+                                                }
+                                            </span>
+
+                                        </div>
+
+                                    )
+                                )
 
                         )}
 
@@ -1254,292 +1234,441 @@ export default function Dashboard() {
                 </div>
 
 
-                {/* Technician Workload + Busiest Days */}
+                {/* Technician Workload */}
 
                 <div
                     className="
-                        mt-5
-                        grid
-                        grid-cols-1
-                        gap-5
-                        lg:grid-cols-2
+                        overflow-hidden
+                        rounded-xl
+                        border
+                        border-gray-200
+                        bg-white
+                        shadow-sm
                     "
                 >
 
-                    {/* Technician Workload */}
-
                     <div
                         className="
-                            rounded-xl
-                            border
+                            border-b
                             border-gray-200
-                            bg-white
-                            p-6
-                            shadow-sm
+                            px-6
+                            py-5
                         "
                     >
 
-                        <div className="mb-5">
+                        <div
+                            className="
+                                flex
+                                items-center
+                                justify-between
+                                gap-4
+                            "
+                        >
 
-                            <h3
-                                className="
-                                    text-base
-                                    font-semibold
-                                    text-gray-900
-                                "
-                            >
-                                Technician Workload
-                            </h3>
+                            <div>
 
-                            <p
+                                <h2
+                                    className="
+                                        text-lg
+                                        font-semibold
+                                        text-gray-900
+                                    "
+                                >
+                                    Technician Workload
+                                </h2>
+
+
+                                <p
+                                    className="
+                                        mt-1
+                                        text-sm
+                                        text-gray-500
+                                    "
+                                >
+                                    Appointments assigned
+                                    during the selected period.
+                                </p>
+
+                            </div>
+
+
+                            <select
+                                value={
+                                    technicianWorkloadTimeframe
+                                }
+                                onChange={(e) =>
+                                    setTechnicianWorkloadTimeframe(
+                                        e.target.value as Timeframe
+                                    )
+                                }
                                 className="
-                                    mt-1
+                                    rounded-lg
+                                    border
+                                    border-gray-300
+                                    bg-white
+                                    px-3
+                                    py-2
                                     text-sm
-                                    text-gray-500
+                                    text-gray-700
+                                    outline-none
+                                    focus:border-blue-500
+                                    focus:ring-2
+                                    focus:ring-blue-500/20
                                 "
                             >
-                                Appointments handled by each technician.
-                            </p>
+
+                                <option value="week">
+                                    This Week
+                                </option>
+
+                                <option value="month">
+                                    This Month
+                                </option>
+
+                                <option value="year">
+                                    This Year
+                                </option>
+
+                            </select>
 
                         </div>
 
+                    </div>
 
-                        {technicianWorkload.length === 0 ? (
 
-                            <p
+                    <div className="divide-y divide-gray-100">
+
+                        {loadingAnalytics ? (
+
+                            <div
                                 className="
-                                    py-6
+                                    px-6
+                                    py-10
                                     text-center
                                     text-sm
                                     text-gray-500
                                 "
                             >
-                                No technician data available.
-                            </p>
+                                Loading...
+                            </div>
+
+                        ) : technicianWorkload.length === 0 ? (
+
+                            <div
+                                className="
+                                    px-6
+                                    py-10
+                                    text-center
+                                    text-sm
+                                    text-gray-500
+                                "
+                            >
+                                No appointments found for{" "}
+                                {timeframeLabel(
+                                    technicianWorkloadTimeframe
+                                ).toLowerCase()}.
+                            </div>
 
                         ) : (
 
-                            <div className="space-y-4">
-
-                                {technicianWorkload.map(
-                                    (item) => (
+                            technicianWorkload
+                                .slice(0, 5)
+                                .map(
+                                    (
+                                        technician,
+                                        index
+                                    ) => (
 
                                         <div
                                             key={
-                                                item.technician
+                                                technician.technician
                                             }
+                                            className="
+                                                flex
+                                                items-center
+                                                justify-between
+                                                px-6
+                                                py-4
+                                            "
                                         >
 
                                             <div
                                                 className="
-                                                    mb-1.5
                                                     flex
                                                     items-center
-                                                    justify-between
-                                                    gap-4
-                                                "
-                                            >
-
-                                                <span
-                                                    className="
-                                                        text-sm
-                                                        text-gray-600
-                                                    "
-                                                >
-                                                    {
-                                                        item.technician
-                                                    }
-                                                </span>
-
-                                                <span
-                                                    className="
-                                                        text-sm
-                                                        font-semibold
-                                                        text-gray-900
-                                                    "
-                                                >
-                                                    {
-                                                        item.appointments
-                                                    }
-                                                </span>
-
-                                            </div>
-
-
-                                            <div
-                                                className="
-                                                    h-2
-                                                    overflow-hidden
-                                                    rounded-full
-                                                    bg-gray-100
+                                                    gap-3
                                                 "
                                             >
 
                                                 <div
                                                     className="
-                                                        h-full
-                                                        rounded-full
-                                                        bg-purple-500
+                                                        flex
+                                                        h-8
+                                                        w-8
+                                                        items-center
+                                                        justify-center
+                                                        rounded-lg
+                                                        bg-orange-50
+                                                        text-sm
+                                                        font-semibold
+                                                        text-orange-600
                                                     "
-                                                    style={{
-                                                        width: `${
-                                                            (
-                                                                item.appointments /
-                                                                maxTechnicianAppointments
-                                                            ) *
-                                                            100
-                                                        }%`,
-                                                    }}
-                                                />
+                                                >
+                                                    {index + 1}
+                                                </div>
+
+
+                                                <span
+                                                    className="
+                                                        text-sm
+                                                        font-medium
+                                                        text-gray-900
+                                                    "
+                                                >
+                                                    {
+                                                        technician.technician
+                                                    }
+                                                </span>
 
                                             </div>
+
+
+                                            <span
+                                                className="
+                                                    text-sm
+                                                    font-semibold
+                                                    text-gray-700
+                                                "
+                                            >
+                                                {
+                                                    technician.appointments
+                                                }
+                                            </span>
 
                                         </div>
 
                                     )
-                                )}
-
-                            </div>
+                                )
 
                         )}
 
                     </div>
 
+                </div>
 
-                    {/* Busiest Days */}
+
+                {/* Busiest Days */}
+
+                <div
+                    className="
+                        overflow-hidden
+                        rounded-xl
+                        border
+                        border-gray-200
+                        bg-white
+                        shadow-sm
+                    "
+                >
 
                     <div
                         className="
-                            rounded-xl
-                            border
+                            border-b
                             border-gray-200
-                            bg-white
-                            p-6
-                            shadow-sm
+                            px-6
+                            py-5
                         "
                     >
 
-                        <div className="mb-5">
+                        <div
+                            className="
+                                flex
+                                items-center
+                                justify-between
+                                gap-4
+                            "
+                        >
 
-                            <h3
-                                className="
-                                    text-base
-                                    font-semibold
-                                    text-gray-900
-                                "
-                            >
-                                Busiest Days
-                            </h3>
+                            <div>
 
-                            <p
+                                <h2
+                                    className="
+                                        text-lg
+                                        font-semibold
+                                        text-gray-900
+                                    "
+                                >
+                                    Busiest Days
+                                </h2>
+
+
+                                <p
+                                    className="
+                                        mt-1
+                                        text-sm
+                                        text-gray-500
+                                    "
+                                >
+                                    Appointments by day.
+                                </p>
+
+                            </div>
+
+
+                            <select
+                                value={
+                                    busiestDaysTimeframe
+                                }
+                                onChange={(e) =>
+                                    setBusiestDaysTimeframe(
+                                        e.target.value as Timeframe
+                                    )
+                                }
                                 className="
-                                    mt-1
+                                    rounded-lg
+                                    border
+                                    border-gray-300
+                                    bg-white
+                                    px-3
+                                    py-2
                                     text-sm
-                                    text-gray-500
+                                    text-gray-700
+                                    outline-none
+                                    focus:border-blue-500
+                                    focus:ring-2
+                                    focus:ring-blue-500/20
                                 "
                             >
-                                Appointment volume by day of the week.
-                            </p>
+
+                                <option value="week">
+                                    This Week
+                                </option>
+
+                                <option value="month">
+                                    This Month
+                                </option>
+
+                                <option value="year">
+                                    This Year
+                                </option>
+
+                            </select>
 
                         </div>
 
+                    </div>
 
-                        {busiestDays.length === 0 ? (
 
-                            <p
+                    <div className="divide-y divide-gray-100">
+
+                        {loadingAnalytics ? (
+
+                            <div
                                 className="
-                                    py-6
+                                    px-6
+                                    py-10
                                     text-center
                                     text-sm
                                     text-gray-500
                                 "
                             >
-                                No appointment data available.
-                            </p>
+                                Loading...
+                            </div>
+
+                        ) : busiestDays.length === 0 ? (
+
+                            <div
+                                className="
+                                    px-6
+                                    py-10
+                                    text-center
+                                    text-sm
+                                    text-gray-500
+                                "
+                            >
+                                No appointments found for{" "}
+                                {timeframeLabel(
+                                    busiestDaysTimeframe
+                                ).toLowerCase()}.
+                            </div>
 
                         ) : (
 
-                            <div className="space-y-4">
-
-                                {busiestDays.map(
-                                    (item) => (
+                            busiestDays
+                                .slice(0, 7)
+                                .map(
+                                    (
+                                        day,
+                                        index
+                                    ) => (
 
                                         <div
                                             key={
-                                                item.day
+                                                day.day
                                             }
+                                            className="
+                                                flex
+                                                items-center
+                                                justify-between
+                                                px-6
+                                                py-4
+                                            "
                                         >
 
                                             <div
                                                 className="
-                                                    mb-1.5
                                                     flex
                                                     items-center
-                                                    justify-between
-                                                    gap-4
-                                                "
-                                            >
-
-                                                <span
-                                                    className="
-                                                        text-sm
-                                                        text-gray-600
-                                                    "
-                                                >
-                                                    {
-                                                        item.day
-                                                    }
-                                                </span>
-
-                                                <span
-                                                    className="
-                                                        text-sm
-                                                        font-semibold
-                                                        text-gray-900
-                                                    "
-                                                >
-                                                    {
-                                                        item.appointments
-                                                    }
-                                                </span>
-
-                                            </div>
-
-
-                                            <div
-                                                className="
-                                                    h-2
-                                                    overflow-hidden
-                                                    rounded-full
-                                                    bg-gray-100
+                                                    gap-3
                                                 "
                                             >
 
                                                 <div
                                                     className="
-                                                        h-full
-                                                        rounded-full
-                                                        bg-orange-500
+                                                        flex
+                                                        h-8
+                                                        w-8
+                                                        items-center
+                                                        justify-center
+                                                        rounded-lg
+                                                        bg-purple-50
+                                                        text-sm
+                                                        font-semibold
+                                                        text-purple-600
                                                     "
-                                                    style={{
-                                                        width: `${
-                                                            (
-                                                                item.appointments /
-                                                                maxDayAppointments
-                                                            ) *
-                                                            100
-                                                        }%`,
-                                                    }}
-                                                />
+                                                >
+                                                    {index + 1}
+                                                </div>
+
+
+                                                <span
+                                                    className="
+                                                        text-sm
+                                                        font-medium
+                                                        text-gray-900
+                                                    "
+                                                >
+                                                    {day.day}
+                                                </span>
 
                                             </div>
+
+
+                                            <span
+                                                className="
+                                                    text-sm
+                                                    font-semibold
+                                                    text-gray-700
+                                                "
+                                            >
+                                                {
+                                                    day.appointments
+                                                }
+                                            </span>
 
                                         </div>
 
                                     )
-                                )}
-
-                            </div>
+                                )
 
                         )}
 
