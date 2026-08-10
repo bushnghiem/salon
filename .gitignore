@@ -1,0 +1,5 @@
+# Database
+backend/nailsalon.db
+backend/nailsalon.db-*
+
+.DS_Store
